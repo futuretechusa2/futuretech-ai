@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Future Tech USA AI Assistant</title>
+
+<style>
+
+body{
+font-family:Arial;
+margin:0;
+padding:0;
+}
+
+#chat-button{
+
+position:fixed;
+bottom:25px;
+right:25px;
+width:75px;
+height:75px;
+border-radius:50%;
+background:#0B4D91;
+color:white;
+font-size:28px;
+border:none;
+cursor:pointer;
+box-shadow:0 0 20px rgba(0,0,0,.25);
+
+}
+
+#chat-window{
+
+display:none;
+position:fixed;
+bottom:120px;
+right:25px;
+width:350px;
+height:500px;
+background:white;
+border-radius:20px;
+box-shadow:0 0 25px rgba(0,0,0,.20);
+overflow:hidden;
+
+}
+
+#header{
+
+background:#0B4D91;
+color:white;
+padding:20px;
+font-size:22px;
+font-weight:bold;
+
+}
+
+#messages{
+
+padding:20px;
+height:320px;
+overflow:auto;
+
+}
+
+#input{
+
+display:flex;
+padding:15px;
+
+}
+
+#user-input{
+
+width:100%;
+padding:12px;
+border-radius:10px;
+border:1px solid #ccc;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="chat-window">
+
+<div id="header">
+
+Future Tech USA
+
+</div>
+
+
+<div id="messages">
+
+<p><b>AI Assistant:</b> Welcome to Future Tech USA! I'm here to help you find the perfect payment solution for your business.</p>
+
+<p><b>AI Assistant:</b> What type of business do you own?</p>
+
+</div>
+
+
+<div id="input">
+
+<input id="user-input"
+placeholder="Type here..." />
+
+</div>
+
+</div>
+
+
+<button id="chat-button">
+
+💬
+
+</button>
+
+
+<script>
+
+let button=document.getElementById("chat-button");
+
+let chat=document.getElementById("chat-window");
+
+
+button.onclick=function(){
+
+if(chat.style.display==="block"){
+
+chat.style.display="none";
+
+}
+
+else{
+
+chat.style.display="block";
+
+}
+
+}
+
+
+</script>
+
+</body>
+
+</html>
