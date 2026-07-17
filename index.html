@@ -1,149 +1,644 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Future Tech USA AI Assistant</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<style>
+  <title>Futura | Future Tech USA</title>
 
-body{
-font-family:Arial;
-margin:0;
-padding:0;
-}
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-#chat-button{
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: transparent;
+    }
 
-position:fixed;
-bottom:25px;
-right:25px;
-width:75px;
-height:75px;
-border-radius:50%;
-background:#0B4D91;
-color:white;
-font-size:28px;
-border:none;
-cursor:pointer;
-box-shadow:0 0 20px rgba(0,0,0,.25);
+    /* FLOATING FUTURA BUTTON */
 
-}
+    #futura-launcher {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
 
-#chat-window{
+    #futura-launcher-label {
+      background: #ffffff;
+      color: #081a36;
+      padding: 12px 17px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 700;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+      white-space: nowrap;
+    }
 
-display:none;
-position:fixed;
-bottom:120px;
-right:25px;
-width:350px;
-height:500px;
-background:white;
-border-radius:20px;
-box-shadow:0 0 25px rgba(0,0,0,.20);
-overflow:hidden;
+    #futura-logo {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
 
-}
+      background:
+        radial-gradient(circle at 50% 38%, #f8df95 0%, #c79832 32%, #735219 68%, #07152c 100%);
 
-#header{
+      border: 3px solid #d8b45b;
+      box-shadow:
+        0 0 0 5px rgba(216, 180, 91, 0.15),
+        0 0 28px rgba(216, 180, 91, 0.55);
 
-background:#0B4D91;
-color:white;
-padding:20px;
-font-size:22px;
-font-weight:bold;
+      color: #ffffff;
+      font-family: Georgia, serif;
+      font-size: 35px;
+      font-weight: bold;
 
-}
+      animation: futuraGlow 3s ease-in-out infinite;
+    }
 
-#messages{
+    @keyframes futuraGlow {
+      0%, 100% {
+        box-shadow:
+          0 0 0 5px rgba(216, 180, 91, 0.14),
+          0 0 22px rgba(216, 180, 91, 0.42);
+      }
 
-padding:20px;
-height:320px;
-overflow:auto;
+      50% {
+        box-shadow:
+          0 0 0 8px rgba(216, 180, 91, 0.08),
+          0 0 38px rgba(216, 180, 91, 0.75);
+      }
+    }
 
-}
+    /* CHAT WINDOW */
 
-#input{
+    #futura-chat {
+      position: fixed;
+      right: 24px;
+      bottom: 115px;
+      z-index: 999998;
 
-display:flex;
-padding:15px;
+      width: 390px;
+      height: 610px;
+      max-height: calc(100vh - 145px);
 
-}
+      display: none;
+      flex-direction: column;
 
-#user-input{
+      background: #ffffff;
+      border: 1px solid rgba(201, 159, 67, 0.55);
+      border-radius: 24px;
+      overflow: hidden;
 
-width:100%;
-padding:12px;
-border-radius:10px;
-border:1px solid #ccc;
+      box-shadow: 0 25px 70px rgba(0, 0, 0, 0.28);
+    }
 
-}
+    #futura-chat.open {
+      display: flex;
+      animation: openFutura 0.25s ease-out;
+    }
 
-</style>
+    @keyframes openFutura {
+      from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+      }
 
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* HEADER */
+
+    #futura-header {
+      min-height: 92px;
+      padding: 18px 18px 16px;
+      display: flex;
+      align-items: center;
+
+      background: linear-gradient(135deg, #06152e, #0b2852);
+      color: #ffffff;
+      border-bottom: 3px solid #caa247;
+    }
+
+    #futura-header-logo {
+      width: 54px;
+      height: 54px;
+      min-width: 54px;
+      margin-right: 13px;
+
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      background:
+        radial-gradient(circle at 50% 38%, #f8df95 0%, #c79832 35%, #735219 70%, #07152c 100%);
+
+      border: 2px solid #e3c46f;
+      color: #ffffff;
+      font-family: Georgia, serif;
+      font-size: 26px;
+      font-weight: bold;
+    }
+
+    #futura-header-text {
+      flex: 1;
+    }
+
+    #futura-title {
+      margin: 0 0 4px;
+      font-family: Georgia, serif;
+      font-size: 25px;
+      color: #e2c06c;
+    }
+
+    #futura-subtitle {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    #futura-close {
+      width: 38px;
+      height: 38px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 21px;
+      cursor: pointer;
+    }
+
+    #futura-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* MESSAGES */
+
+    #futura-messages {
+      flex: 1;
+      padding: 19px;
+      overflow-y: auto;
+      background:
+        linear-gradient(rgba(255,255,255,0.94), rgba(255,255,255,0.94)),
+        radial-gradient(circle at top right, #f6e9bd, transparent 45%);
+    }
+
+    .message-row {
+      display: flex;
+      margin-bottom: 14px;
+    }
+
+    .message-row.user {
+      justify-content: flex-end;
+    }
+
+    .message {
+      max-width: 84%;
+      padding: 12px 14px;
+      border-radius: 17px;
+      font-size: 14px;
+      line-height: 1.55;
+      white-space: pre-line;
+    }
+
+    .message.futura {
+      background: #f2f4f8;
+      color: #17233a;
+      border-bottom-left-radius: 5px;
+    }
+
+    .message.user {
+      background: linear-gradient(135deg, #0b2852, #0a1a34);
+      color: #ffffff;
+      border-bottom-right-radius: 5px;
+    }
+
+    .message-name {
+      display: block;
+      margin-bottom: 4px;
+      color: #a77a20;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    /* TYPING INDICATOR */
+
+    #typing-indicator {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      width: fit-content;
+      margin: 0 19px 12px;
+      padding: 11px 14px;
+      background: #f2f4f8;
+      border-radius: 16px;
+    }
+
+    #typing-indicator span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #b58a2f;
+      animation: typingDot 1.2s infinite;
+    }
+
+    #typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    #typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes typingDot {
+      0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.45;
+      }
+
+      30% {
+        transform: translateY(-5px);
+        opacity: 1;
+      }
+    }
+
+    /* INPUT AREA */
+
+    #futura-input-area {
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #ffffff;
+      border-top: 1px solid #e3e6ec;
+    }
+
+    #futura-input {
+      flex: 1;
+      min-width: 0;
+      height: 48px;
+      padding: 0 15px;
+
+      border: 1px solid #ccd2dc;
+      border-radius: 14px;
+      outline: none;
+
+      font-size: 15px;
+      color: #111b2d;
+    }
+
+    #futura-input:focus {
+      border-color: #c69b3b;
+      box-shadow: 0 0 0 3px rgba(198, 155, 59, 0.13);
+    }
+
+    #futura-send {
+      width: 48px;
+      height: 48px;
+      min-width: 48px;
+
+      border: none;
+      border-radius: 50%;
+
+      background: linear-gradient(135deg, #c9a248, #936a1d);
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    #futura-send:hover {
+      transform: translateY(-1px);
+    }
+
+    #futura-footer {
+      padding: 0 14px 12px;
+      text-align: center;
+      background: #ffffff;
+      color: #7a808c;
+      font-size: 10px;
+    }
+
+    /* MOBILE */
+
+    @media (max-width: 600px) {
+      #futura-launcher {
+        right: 14px;
+        bottom: 14px;
+      }
+
+      #futura-launcher-label {
+        display: none;
+      }
+
+      #futura-logo {
+        width: 65px;
+        height: 65px;
+      }
+
+      #futura-chat {
+        right: 10px;
+        bottom: 88px;
+        width: calc(100vw - 20px);
+        height: calc(100vh - 105px);
+        max-height: none;
+        border-radius: 20px;
+      }
+    }
+  </style>
 </head>
 
 <body>
 
-<div id="chat-window">
+  <!-- FLOATING BUTTON -->
 
-<div id="header">
+  <button id="futura-launcher" aria-label="Open Futura">
+    <span id="futura-launcher-label">Ask Futura</span>
+    <span id="futura-logo">F</span>
+  </button>
 
-Future Tech USA
+  <!-- CHAT WINDOW -->
 
-</div>
+  <section id="futura-chat" aria-label="Futura Chat">
 
+    <header id="futura-header">
+      <div id="futura-header-logo">F</div>
 
-<div id="messages">
+      <div id="futura-header-text">
+        <h2 id="futura-title">Futura</h2>
+        <p id="futura-subtitle">
+          AI Payment Solutions Specialist &amp; Customer Concierge
+        </p>
+      </div>
 
-<p><b>AI Assistant:</b> Welcome to Future Tech USA! I'm here to help you find the perfect payment solution for your business.</p>
+      <button id="futura-close" aria-label="Close Futura">×</button>
+    </header>
 
-<p><b>AI Assistant:</b> What type of business do you own?</p>
+    <main id="futura-messages"></main>
 
-</div>
+    <div id="typing-indicator">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
 
+    <div id="futura-input-area">
+      <input
+        id="futura-input"
+        type="text"
+        placeholder="Type your message..."
+        autocomplete="off"
+      />
 
-<div id="input">
+      <button id="futura-send" aria-label="Send message">➤</button>
+    </div>
 
-<input id="user-input"
-placeholder="Type here..." />
+    <div id="futura-footer">
+      No pressure. No obligation. Just helpful answers.
+    </div>
 
-</div>
+  </section>
 
-</div>
+  <script>
+    const launcher = document.getElementById("futura-launcher");
+    const chat = document.getElementById("futura-chat");
+    const closeButton = document.getElementById("futura-close");
+    const sendButton = document.getElementById("futura-send");
+    const input = document.getElementById("futura-input");
+    const messages = document.getElementById("futura-messages");
+    const typingIndicator = document.getElementById("typing-indicator");
 
+    let conversationStep = 0;
 
-<button id="chat-button">
+    const customerStory = {
+      businessType: "",
+      monthlyVolume: "",
+      currentSystem: "",
+      mainConcern: ""
+    };
 
-💬
+    const greeting =
+`Hello! I'm Futura, Future Tech USA's AI Payment Solutions Specialist & Customer Concierge.
 
-</button>
+I'm here to help you make informed decisions about your business payment solutions.
 
+Whether you're opening a new business, exploring POS systems, upgrading equipment, or simply comparing your options, I'm happy to help.
 
-<script>
+What can I help you with today?`;
 
-let button=document.getElementById("chat-button");
+    function addMessage(sender, text) {
+      const row = document.createElement("div");
+      row.className = "message-row " + sender;
 
-let chat=document.getElementById("chat-window");
+      const bubble = document.createElement("div");
+      bubble.className = "message " + sender;
 
+      if (sender === "futura") {
+        const name = document.createElement("span");
+        name.className = "message-name";
+        name.textContent = "Futura";
+        bubble.appendChild(name);
+      }
 
-button.onclick=function(){
+      const textNode = document.createElement("span");
+      textNode.textContent = text;
+      bubble.appendChild(textNode);
 
-if(chat.style.display==="block"){
+      row.appendChild(bubble);
+      messages.appendChild(row);
 
-chat.style.display="none";
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-}
+    function showTyping() {
+      typingIndicator.style.display = "flex";
+      messages.scrollTop = messages.scrollHeight;
+    }
 
-else{
+    function hideTyping() {
+      typingIndicator.style.display = "none";
+    }
 
-chat.style.display="block";
+    function getFuturaResponse(userMessage) {
+      const message = userMessage.toLowerCase();
 
-}
+      if (
+        message.includes("hello") ||
+        message.includes("hi") ||
+        message.includes("hey")
+      ) {
+        return "Hello! It's a pleasure to meet you. Are you looking for help with payment processing, a POS system, equipment, or something else?";
+      }
 
-}
+      if (
+        message.includes("clover") ||
+        message.includes("pos") ||
+        message.includes("point of sale")
+      ) {
+        customerStory.mainConcern = "POS system";
+        conversationStep = 1;
 
+        return "I'd be happy to help you explore POS options. The right solution depends on your business type, daily operations, reporting needs, and payment environment. What type of business do you operate?";
+      }
 
-</script>
+      if (
+        message.includes("fee") ||
+        message.includes("rate") ||
+        message.includes("cost") ||
+        message.includes("expensive")
+      ) {
+        customerStory.mainConcern = "Processing costs";
+        conversationStep = 1;
+
+        return "I understand. Processing costs are an important concern for many business owners. Your available options can depend on factors such as business type, monthly volume, and how customers usually pay. What type of business do you operate?";
+      }
+
+      if (
+        message.includes("restaurant") ||
+        message.includes("retail") ||
+        message.includes("salon") ||
+        message.includes("medical") ||
+        message.includes("service") ||
+        message.includes("store") ||
+        message.includes("business")
+      ) {
+        customerStory.businessType = userMessage;
+        conversationStep = 2;
+
+        return "Thank you. Approximately how much do you process in card payments during an average month?";
+      }
+
+      if (
+        message.includes("$") ||
+        message.includes("thousand") ||
+        message.includes("monthly") ||
+        message.match(/\d/)
+      ) {
+        customerStory.monthlyVolume = userMessage;
+        conversationStep = 3;
+
+        return "Thank you. Are you currently using a POS system or payment provider such as Clover, Square, Toast, Stripe, or another solution?";
+      }
+
+      if (
+        message.includes("square") ||
+        message.includes("toast") ||
+        message.includes("stripe") ||
+        message.includes("dejavoo") ||
+        message.includes("pax") ||
+        message.includes("swipesimple")
+      ) {
+        customerStory.currentSystem = userMessage;
+        conversationStep = 4;
+
+        return "That helps me understand your current setup. What would you most like to improve: processing costs, equipment, reporting, customer support, online payments, or something else?";
+      }
+
+      if (
+        message.includes("consultation") ||
+        message.includes("appointment") ||
+        message.includes("contact") ||
+        message.includes("call")
+      ) {
+        return "I'd be happy to help arrange a complimentary consultation. Please share your preferred contact method, such as email or phone, along with the best time for the Future Tech USA team to reach you.";
+      }
+
+      if (conversationStep === 0) {
+        conversationStep = 1;
+
+        return "Thank you for sharing that. I'd be happy to learn more so I can provide helpful guidance. What type of business do you operate?";
+      }
+
+      if (conversationStep === 1) {
+        customerStory.businessType = userMessage;
+        conversationStep = 2;
+
+        return "Thank you. Approximately how much do you process in card payments during an average month?";
+      }
+
+      if (conversationStep === 2) {
+        customerStory.monthlyVolume = userMessage;
+        conversationStep = 3;
+
+        return "Are you currently using a POS system or payment provider? If so, which one?";
+      }
+
+      if (conversationStep === 3) {
+        customerStory.currentSystem = userMessage;
+        conversationStep = 4;
+
+        return "What is the most important improvement you're looking for: lower costs, upgraded equipment, better reporting, stronger support, or another need?";
+      }
+
+      if (conversationStep === 4) {
+        customerStory.mainConcern = userMessage;
+        conversationStep = 5;
+
+        return `Thank you. Based on what you've shared, I understand that you operate ${customerStory.businessType || "a business"}, process approximately ${customerStory.monthlyVolume || "an unspecified monthly amount"}, currently use ${customerStory.currentSystem || "an existing payment solution"}, and would like help with ${customerStory.mainConcern}.
+
+There may be several solutions worth exploring. Would you like information about a complimentary consultation with a Future Tech USA payment specialist?`;
+      }
+
+      return "Thank you for explaining that. I'm happy to help. Could you tell me a little more about what you would like to improve with your current payment or POS setup?";
+    }
+
+    function sendMessage() {
+      const userMessage = input.value.trim();
+
+      if (!userMessage) {
+        return;
+      }
+
+      addMessage("user", userMessage);
+      input.value = "";
+
+      showTyping();
+
+      window.setTimeout(() => {
+        hideTyping();
+
+        const response = getFuturaResponse(userMessage);
+        addMessage("futura", response);
+      }, 850);
+    }
+
+    launcher.addEventListener("click", () => {
+      chat.classList.add("open");
+      input.focus();
+
+      if (messages.children.length === 0) {
+        addMessage("futura", greeting);
+      }
+    });
+
+    closeButton.addEventListener("click", () => {
+      chat.classList.remove("open");
+    });
+
+    sendButton.addEventListener("click", sendMessage);
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
 
 </body>
-
 </html>
