@@ -543,25 +543,14 @@
     const messages = document.getElementById("futura-messages");
     const typingIndicator = document.getElementById("typing-indicator");
 
-    let conversationStep = 0;
-
-    const customerStory = {
-      businessType: "",
-      monthlyVolume: "",
-      currentSystem: "",
-      mainConcern: ""
-    };
+      const conversationHistory = [];
 
     const greeting =
 `Hello! I'm Futura.
 
 I'm Future Tech USA's AI Payment Solutions Specialist & Customer Concierge.
 
-I'm here to help business owners make informed decisions about their payment solutions.
-
-Whether you're opening a new business, exploring POS systems, upgrading equipment, or simply comparing your options, I'm happy to help.
-
-No pressure. No obligation. Just helpful answers.
+I can help you explore payment processing, POS systems, equipment, restaurant solutions, retail solutions, and complimentary consultations.
 
 What can I help you with today?`;
 
@@ -597,89 +586,20 @@ What can I help you with today?`;
       typingIndicator.style.display = "none";
     }
 
-    function getFuturaResponse(userMessage) {
-      const message = userMessage.toLowerCase();
+    function createConversationTranscript() {
+      return conversationHistory
+        .map((item) => {
+          const speaker =
+            item.role === "user"
+              ? "Website visitor"
+              : "Futura";
 
-      if (
-        message.includes("hello") ||
-        message.includes("hi") ||
-        message.includes("hey")
-      ) {
-        return "Hello! It's a pleasure to meet you. Are you looking for help with payment processing, a POS system, equipment, online payments, or something else?";
-      }
-
-      if (
-        message.includes("clover") ||
-        message.includes("pos") ||
-        message.includes("point of sale")
-      ) {
-        customerStory.mainConcern = "POS system";
-        conversationStep = 1;
-
-        return "I'd be happy to help you explore POS options. The right solution depends on your business type, daily operations, reporting needs, and payment environment. What type of business do you operate?";
-      }
-
-      if (
-        message.includes("fee") ||
-        message.includes("rate") ||
-        message.includes("cost") ||
-        message.includes("expensive")
-      ) {
-        customerStory.mainConcern = "processing costs";
-        conversationStep = 1;
-
-        return "I understand. Processing costs are an important concern for many business owners. Available options can depend on factors such as business type, monthly volume, and how customers usually pay. What type of business do you operate?";
-      }
-
-      if (
-        message.includes("consultation") ||
-        message.includes("appointment") ||
-        message.includes("contact") ||
-        message.includes("call")
-      ) {
-        return "I'd be happy to help arrange a complimentary consultation. Please share your preferred contact method, such as email or phone, and the best time for the Future Tech USA team to reach you.";
-      }
-
-      if (conversationStep === 0) {
-        conversationStep = 1;
-
-        return "Thank you for sharing that. I'd be happy to learn more so I can provide helpful guidance. What type of business do you operate?";
-      }
-
-      if (conversationStep === 1) {
-        customerStory.businessType = userMessage;
-        conversationStep = 2;
-
-        return "Thank you. Approximately how much do you process in card payments during an average month?";
-      }
-
-      if (conversationStep === 2) {
-        customerStory.monthlyVolume = userMessage;
-        conversationStep = 3;
-
-        return "Are you currently using a POS system or payment provider? If so, which one?";
-      }
-
-      if (conversationStep === 3) {
-        customerStory.currentSystem = userMessage;
-        conversationStep = 4;
-
-        return "What is the most important improvement you're looking for: lower costs, upgraded equipment, better reporting, stronger support, online payments, or another need?";
-      }
-
-      if (conversationStep === 4) {
-        customerStory.mainConcern = userMessage;
-        conversationStep = 5;
-
-        return `Thank you. Based on what you've shared, I understand that you operate ${customerStory.businessType || "a business"}, process approximately ${customerStory.monthlyVolume || "an unspecified monthly amount"}, currently use ${customerStory.currentSystem || "an existing payment solution"}, and would like help with ${customerStory.mainConcern}.
-
-There may be several solutions worth exploring. Would you like information about a complimentary consultation with a Future Tech USA payment specialist?`;
-      }
-
-      return "Thank you for explaining that. Could you tell me a little more about what you would like to improve with your current payment or POS setup?";
+          return `${speaker}: ${item.content}`;
+        })
+        .join("\n\n");
     }
 
-    function sendMessage() {
+    async function sendMessage() {
       const userMessage = input.value.trim();
 
       if (!userMessage) {
@@ -687,16 +607,61 @@ There may be several solutions worth exploring. Would you like information about
       }
 
       addMessage("user", userMessage);
+
       input.value = "";
+      input.disabled = true;
+      sendButton.disabled = true;
+
+      conversationHistory.push({
+        role: "user",
+        content: userMessage
+      });
 
       showTyping();
 
-      window.setTimeout(() => {
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: createConversationTranscript()
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Futura could not answer right now."
+          );
+        }
+
+        const reply =
+          data.reply ||
+          "I'm sorry, but I wasn't able to create a response.";
+
+        conversationHistory.push({
+          role: "assistant",
+          content: reply
+        });
+
+        addMessage("futura", reply);
+      } catch (error) {
+        console.error("Futura chat error:", error);
+
+        addMessage(
+          "futura",
+          "I'm temporarily unable to connect. Please try again in a moment."
+        );
+      } finally {
         hideTyping();
 
-        const response = getFuturaResponse(userMessage);
-        addMessage("futura", response);
-      }, 850);
+        input.disabled = false;
+        sendButton.disabled = false;
+        input.focus();
+      }
     }
 
     launcher.addEventListener("click", () => {
@@ -705,6 +670,11 @@ There may be several solutions worth exploring. Would you like information about
 
       if (messages.children.length === 0) {
         addMessage("futura", greeting);
+
+        conversationHistory.push({
+          role: "assistant",
+          content: greeting
+        });
       }
     });
 
