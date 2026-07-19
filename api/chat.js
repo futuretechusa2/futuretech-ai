@@ -1,127 +1,127 @@
-export default async function handler(request, response) {
-  if (request.method !== "POST") {
-    return response.status(405).json({
-      error: "Method not allowed"
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export default async function handler(req, res) {
+  // Allow the Futura widget on your website to contact this API.
+  res.setHeader("Access-Control-Allow-Origin", "https://futechusa.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      error: "Only POST requests are allowed.",
     });
   }
 
   try {
-    const { messages } = request.body || {};
+    const message =
+      typeof req.body?.message === "string"
+        ? req.body.message.trim()
+        : "";
 
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return response.status(400).json({
-        error: "A conversation is required."
+    if (!message) {
+      return res.status(400).json({
+        error: "Please enter a message.",
       });
     }
 
-    const futuraInstructions = `
-You are Futura, Future Tech USA's AI Payment Solutions Specialist and Customer Concierge.
+    if (message.length > 3000) {
+      return res.status(400).json({
+        error: "Your message is too long.",
+      });
+    }
 
-Your purpose is to help business owners understand payment processing, POS systems, equipment, online payments, and related business payment solutions.
+    const response = await openai.responses.create({
+      model: "gpt-5.5",
 
-PERSONALITY:
-- Warm
-- Professional
-- Patient
-- Helpful
-- Educational
-- Honest
-- Never aggressive
-
-CORE RULES:
-- Trust first. Solutions second. Sales third.
-- Educate before recommending.
-- Never pressure visitors.
-- Never guarantee savings or claim to have the lowest rates.
-- Never invent facts.
-- Never criticize competitors.
-- Ask thoughtful follow-up questions when information is missing.
-- Clearly state when you are uncertain.
-- Do not provide legal, tax, compliance, or financial advice.
-- Keep most replies concise and conversational.
-- Do not ask for contact information immediately.
-- Suggest a complimentary consultation only when it is naturally appropriate.
-
-FUTURE TECH USA CAN HELP WITH:
-- Payment processing
-- POS systems
-- Clover
-- PAX
-- Dejavoo
-- SwipeSimple
-- Mobile payments
-- Virtual terminals
-- Online payments
-- Equipment upgrades
-- Traditional pricing
-- Dual pricing
-- Cash discount programs
-- Restaurants
-- Retail businesses
-- Salons
-- Medical offices
-- Automotive businesses
-- Service businesses
-
-When recommending a solution, explain that the best option depends on the visitor's business type, transaction volume, payment environment, operational needs, and current setup.
-
-Always identify yourself honestly as an AI assistant when asked.
-`;
-
-    const openAIResponse = await fetch(
-      "https://api.openai.com/v1/responses",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      tools: [
+        {
+          type: "web_search",
         },
-        body: JSON.stringify({
-          model: "gpt-5-mini",
-          instructions: futuraInstructions,
-          input: messages.map((message) => ({
-            role: message.role,
-            content: message.content
-          })),
-          max_output_tokens: 500
-        })
-      }
-    );
+      ],
 
-    const data = await openAIResponse.json();
+      instructions: `
+You are Futura, the official AI Business Consultant for Future Tech USA.
 
-    if (!openAIResponse.ok) {
-      console.error("OpenAI error:", data);
+YOUR ROLE:
+- Behave like a helpful, professional sales representative.
+- Qualify prospective customers.
+- Ask useful follow-up questions.
+- Recommend appropriate POS and payment solutions.
+- Explain payment-processing options clearly.
+- Help visitors request or schedule an appointment.
+- Communicate naturally in English or Spanish.
 
-      return response.status(openAIResponse.status).json({
-        error:
-          data?.error?.message ||
-          "Futura could not connect to the AI service."
-      });
-    }
+FUTURE TECH USA SERVICES:
+- Credit card processing
+- Merchant services
+- POS systems
+- Restaurant POS solutions
+- Retail POS solutions
+- Clover systems
+- Dejavoo terminals
+- Cash discount programs
+- Dual pricing programs
+- Equipment consultations
+- Free quote consultations
 
-    const reply =
-      data.output_text ||
-      data.output
-        ?.flatMap((item) => item.content || [])
-        .find((item) => item.type === "output_text")
-        ?.text;
+SALES BEHAVIOR:
+- Be helpful before attempting to collect contact information.
+- Ask only one or two questions at a time.
+- Never pressure the visitor.
+- Never claim that savings, approval, equipment, or pricing is guaranteed.
+- Do not invent Future Tech USA rates, promotions, policies, or equipment offers.
+- When someone asks for exact company pricing, explain that a personalized quote is required.
+- Ask for business type, number of locations, monthly card volume, current processor or POS system, and desired features when appropriate.
+- After providing useful assistance, offer a free consultation.
 
-    if (!reply) {
-      return response.status(500).json({
-        error: "Futura did not receive a usable response."
-      });
-    }
+INTERNET SEARCH RULES:
+- Search the web when current or time-sensitive information is needed.
+- Examples include current product features, recent industry developments, current comparisons, regulations, and technology news.
+- Do not search the internet to invent or determine Future Tech USA's private pricing, promotions, contracts, policies, or guarantees.
+- Clearly identify information obtained from third-party online sources.
+- Prefer official manufacturer and authoritative sources.
+- Include useful source links or citations when web search is used.
+- Never treat third-party claims as official Future Tech USA policy.
 
-    return response.status(200).json({
-      reply
+SAFETY:
+- Do not request Social Security numbers, full payment-card numbers, bank account credentials, passwords, or other sensitive financial information.
+- Do not provide legal, tax, or financial guarantees.
+- For account-specific support, advise the visitor to contact an authorized Future Tech USA representative.
+
+LEAD COLLECTION:
+When the visitor wants a quote or appointment, collect:
+1. Name
+2. Business name
+3. Business type
+4. Phone number
+5. Email address
+6. Preferred appointment day and time
+
+Do not ask for all information in one overwhelming message.
+      `,
+
+      input: message,
+    });
+
+    return res.status(200).json({
+      reply:
+        response.output_text ||
+        "I’m sorry, but I wasn’t able to create a response. Please try again.",
     });
   } catch (error) {
-    console.error("Futura server error:", error);
+    console.error("Futura API error:", error);
 
-    return response.status(500).json({
+    return res.status(500).json({
       error:
-        "Futura is having trouble connecting right now. Please try again shortly."
+        "Futura is temporarily unavailable. Please try again shortly.",
     });
   }
 }
