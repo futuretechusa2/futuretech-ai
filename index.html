@@ -535,6 +535,10 @@
   </section>
 
   <script>
+    const API_URL = "https://futuretech-ai.vercel.app/api/chat";
+    const STORAGE_KEY = "futuraConversationV1";
+    const MAX_SAVED_MESSAGES = 20;
+
     const launcher = document.getElementById("futura-launcher");
     const chat = document.getElementById("futura-chat");
     const closeButton = document.getElementById("futura-close");
@@ -542,8 +546,6 @@
     const input = document.getElementById("futura-input");
     const messages = document.getElementById("futura-messages");
     const typingIndicator = document.getElementById("typing-indicator");
-
-      const conversationHistory = [];
 
     const greeting =
 `Hello! I'm Futura.
@@ -553,6 +555,36 @@ I'm Future Tech USA's AI Payment Solutions Specialist & Customer Concierge.
 I can help you explore payment processing, POS systems, equipment, restaurant solutions, retail solutions, and complimentary consultations.
 
 What can I help you with today?`;
+
+    let conversationHistory = loadConversation();
+    let requestInProgress = false;
+
+    function loadConversation() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]");
+        return Array.isArray(saved)
+          ? saved.filter(
+              (item) =>
+                item &&
+                (item.role === "user" || item.role === "assistant") &&
+                typeof item.content === "string"
+            ).slice(-MAX_SAVED_MESSAGES)
+          : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveConversation() {
+      try {
+        sessionStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(conversationHistory.slice(-MAX_SAVED_MESSAGES))
+        );
+      } catch {
+        // The chat still works if browser storage is unavailable.
+      }
+    }
 
     function addMessage(sender, text) {
       const row = document.createElement("div");
@@ -574,108 +606,107 @@ What can I help you with today?`;
       bubble.appendChild(messageText);
       row.appendChild(bubble);
       messages.appendChild(row);
-
       messages.scrollTop = messages.scrollHeight;
+    }
+
+    function renderConversation() {
+      messages.innerHTML = "";
+
+      if (conversationHistory.length === 0) {
+        addMessage("futura", greeting);
+        conversationHistory.push({ role: "assistant", content: greeting });
+        saveConversation();
+        return;
+      }
+
+      conversationHistory.forEach((item) => {
+        addMessage(item.role === "user" ? "user" : "futura", item.content);
+      });
     }
 
     function showTyping() {
       typingIndicator.style.display = "flex";
+      messages.scrollTop = messages.scrollHeight;
     }
 
     function hideTyping() {
       typingIndicator.style.display = "none";
     }
 
-    function createConversationTranscript() {
-      return conversationHistory
-        .map((item) => {
-          const speaker =
-            item.role === "user"
-              ? "Website visitor"
-              : "Futura";
-
-          return `${speaker}: ${item.content}`;
-        })
-        .join("\n\n");
+    function setBusy(isBusy) {
+      requestInProgress = isBusy;
+      input.disabled = isBusy;
+      sendButton.disabled = isBusy;
+      sendButton.setAttribute("aria-busy", String(isBusy));
     }
 
     async function sendMessage() {
       const userMessage = input.value.trim();
 
-      if (!userMessage) {
+      if (!userMessage || requestInProgress) {
         return;
       }
 
       addMessage("user", userMessage);
+      conversationHistory.push({ role: "user", content: userMessage });
+      conversationHistory = conversationHistory.slice(-MAX_SAVED_MESSAGES);
+      saveConversation();
 
       input.value = "";
-      input.disabled = true;
-      sendButton.disabled = true;
-
-      conversationHistory.push({
-        role: "user",
-        content: userMessage
-      });
-
+      setBusy(true);
       showTyping();
 
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 30000);
+
       try {
-        const response = await fetch("/api/chat", {
+        const response = await fetch(API_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: createConversationTranscript()
-          })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: conversationHistory }),
+          signal: controller.signal
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(
-            data.error || "Futura could not answer right now."
-          );
+          throw new Error(data.error || "Futura could not answer right now.");
         }
 
         const reply =
-          data.reply ||
-          "I'm sorry, but I wasn't able to create a response.";
+          typeof data.reply === "string" && data.reply.trim()
+            ? data.reply.trim()
+            : "I'm sorry, but I wasn't able to create a response.";
 
-        conversationHistory.push({
-          role: "assistant",
-          content: reply
-        });
-
+        conversationHistory.push({ role: "assistant", content: reply });
+        conversationHistory = conversationHistory.slice(-MAX_SAVED_MESSAGES);
+        saveConversation();
         addMessage("futura", reply);
       } catch (error) {
         console.error("Futura chat error:", error);
 
-        addMessage(
-          "futura",
-          "I'm temporarily unable to connect. Please try again in a moment."
-        );
-      } finally {
-        hideTyping();
+        const errorMessage =
+          error.name === "AbortError"
+            ? "I'm taking longer than expected. Please try your message again."
+            : "I'm temporarily unable to connect. Please try again in a moment.";
 
-        input.disabled = false;
-        sendButton.disabled = false;
+        addMessage("futura", errorMessage);
+      } finally {
+        window.clearTimeout(timeoutId);
+        hideTyping();
+        setBusy(false);
         input.focus();
       }
     }
 
     launcher.addEventListener("click", () => {
       chat.classList.add("open");
-      input.focus();
 
       if (messages.children.length === 0) {
-        addMessage("futura", greeting);
-
-        conversationHistory.push({
-          role: "assistant",
-          content: greeting
-        });
+        renderConversation();
       }
+
+      input.focus();
     });
 
     closeButton.addEventListener("click", () => {
