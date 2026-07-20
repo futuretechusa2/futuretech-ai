@@ -1,6 +1,5 @@
 {
   "name": "futuretech-ai",
-  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +7,6 @@
   },
   "dependencies": {
     "openai": "^5.0.0",
-    "resend": "^4.0.0"
+    "resend": "^6.0.1"
   }
 }
