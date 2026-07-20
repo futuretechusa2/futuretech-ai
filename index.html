@@ -561,7 +561,7 @@ What can I help you with today?`;
 
     function loadConversation() {
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+       const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]");
 
         if (!Array.isArray(saved)) return [];
 
@@ -581,7 +581,7 @@ What can I help you with today?`;
 
     function saveConversation() {
       try {
-        localStorage.setItem(
+       sessionStorage.setItem(
           STORAGE_KEY,
           JSON.stringify(conversationHistory.slice(-MAX_SAVED_MESSAGES))
         );
