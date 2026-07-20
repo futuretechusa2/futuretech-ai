@@ -536,7 +536,8 @@
 
   <script>
     const API_URL = "https://futuretech-ai.vercel.app/api/chat";
-    const STORAGE_KEY = "futuraConversationV1";
+    const CONVERSATION_STORAGE_KEY = "futuraConversationV2";
+    const FACTS_STORAGE_KEY = "futuraBusinessFactsV1";
     const MAX_SAVED_MESSAGES = 20;
 
     const launcher = document.getElementById("futura-launcher");
@@ -556,30 +557,83 @@ I can help you explore payment processing, POS systems, equipment, restaurant so
 
 What can I help you with today?`;
 
+    const EMPTY_BUSINESS_FACTS = {
+      businessType: "",
+      businessName: "",
+      locations: "",
+      currentPOS: "",
+      currentProcessor: "",
+      monthlyVolume: "",
+      primaryConcern: "",
+      desiredFeatures: [],
+      preferredLanguage: "",
+      quoteRequested: false,
+      appointmentRequested: false
+    };
+
     let conversationHistory = loadConversation();
+    let businessFacts = loadBusinessFacts();
     let requestInProgress = false;
 
     function loadConversation() {
       try {
-        const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]");
+        const saved = JSON.parse(
+          sessionStorage.getItem(CONVERSATION_STORAGE_KEY) || "[]"
+        );
+
         return Array.isArray(saved)
-          ? saved.filter(
-              (item) =>
-                item &&
-                (item.role === "user" || item.role === "assistant") &&
-                typeof item.content === "string"
-            ).slice(-MAX_SAVED_MESSAGES)
+          ? saved
+              .filter(
+                (item) =>
+                  item &&
+                  (item.role === "user" || item.role === "assistant") &&
+                  typeof item.content === "string"
+              )
+              .slice(-MAX_SAVED_MESSAGES)
           : [];
       } catch {
         return [];
       }
     }
 
+    function loadBusinessFacts() {
+      try {
+        const saved = JSON.parse(
+          sessionStorage.getItem(FACTS_STORAGE_KEY) || "null"
+        );
+
+        if (!saved || typeof saved !== "object" || Array.isArray(saved)) {
+          return { ...EMPTY_BUSINESS_FACTS };
+        }
+
+        return {
+          ...EMPTY_BUSINESS_FACTS,
+          ...saved,
+          desiredFeatures: Array.isArray(saved.desiredFeatures)
+            ? saved.desiredFeatures.slice(0, 10)
+            : []
+        };
+      } catch {
+        return { ...EMPTY_BUSINESS_FACTS };
+      }
+    }
+
     function saveConversation() {
       try {
         sessionStorage.setItem(
-          STORAGE_KEY,
+          CONVERSATION_STORAGE_KEY,
           JSON.stringify(conversationHistory.slice(-MAX_SAVED_MESSAGES))
+        );
+      } catch {
+        // The chat still works if browser storage is unavailable.
+      }
+    }
+
+    function saveBusinessFacts() {
+      try {
+        sessionStorage.setItem(
+          FACTS_STORAGE_KEY,
+          JSON.stringify(businessFacts)
         );
       } catch {
         // The chat still works if browser storage is unavailable.
@@ -657,13 +711,16 @@ What can I help you with today?`;
       showTyping();
 
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 30000);
+      const timeoutId = window.setTimeout(() => controller.abort(), 45000);
 
       try {
         const response = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: conversationHistory }),
+          body: JSON.stringify({
+            messages: conversationHistory,
+            businessFacts
+          }),
           signal: controller.signal
         });
 
@@ -677,6 +734,17 @@ What can I help you with today?`;
           typeof data.reply === "string" && data.reply.trim()
             ? data.reply.trim()
             : "I'm sorry, but I wasn't able to create a response.";
+
+        if (data.businessFacts && typeof data.businessFacts === "object") {
+          businessFacts = {
+            ...EMPTY_BUSINESS_FACTS,
+            ...data.businessFacts,
+            desiredFeatures: Array.isArray(data.businessFacts.desiredFeatures)
+              ? data.businessFacts.desiredFeatures.slice(0, 10)
+              : businessFacts.desiredFeatures
+          };
+          saveBusinessFacts();
+        }
 
         conversationHistory.push({ role: "assistant", content: reply });
         conversationHistory = conversationHistory.slice(-MAX_SAVED_MESSAGES);
