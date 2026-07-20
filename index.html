@@ -536,9 +536,8 @@
 
   <script>
     const API_URL = "https://futuretech-ai.vercel.app/api/chat";
-    const CONVERSATION_STORAGE_KEY = "futuraConversationV2";
-    const FACTS_STORAGE_KEY = "futuraBusinessFactsV1";
-    const MAX_SAVED_MESSAGES = 20;
+    const STORAGE_KEY = "futura_conversation_v1";
+    const MAX_SAVED_MESSAGES = 30;
 
     const launcher = document.getElementById("futura-launcher");
     const chat = document.getElementById("futura-chat");
@@ -553,90 +552,41 @@
 
 I'm Future Tech USA's AI Payment Solutions Specialist & Customer Concierge.
 
-I can help you explore payment processing, POS systems, equipment, restaurant solutions, retail solutions, and complimentary consultations.
+I can help with payment processing, POS systems, restaurant and retail solutions, equipment questions, technical support, current industry information, and complimentary consultations.
 
 What can I help you with today?`;
 
-    const EMPTY_BUSINESS_FACTS = {
-      businessType: "",
-      businessName: "",
-      locations: "",
-      currentPOS: "",
-      currentProcessor: "",
-      monthlyVolume: "",
-      primaryConcern: "",
-      desiredFeatures: [],
-      preferredLanguage: "",
-      quoteRequested: false,
-      appointmentRequested: false
-    };
-
     let conversationHistory = loadConversation();
-    let businessFacts = loadBusinessFacts();
     let requestInProgress = false;
 
     function loadConversation() {
       try {
-        const saved = JSON.parse(
-          sessionStorage.getItem(CONVERSATION_STORAGE_KEY) || "[]"
-        );
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
 
-        return Array.isArray(saved)
-          ? saved
-              .filter(
-                (item) =>
-                  item &&
-                  (item.role === "user" || item.role === "assistant") &&
-                  typeof item.content === "string"
-              )
-              .slice(-MAX_SAVED_MESSAGES)
-          : [];
+        if (!Array.isArray(saved)) return [];
+
+        return saved
+          .filter(
+            (item) =>
+              item &&
+              (item.role === "user" || item.role === "assistant") &&
+              typeof item.content === "string" &&
+              item.content.trim()
+          )
+          .slice(-MAX_SAVED_MESSAGES);
       } catch {
         return [];
       }
     }
 
-    function loadBusinessFacts() {
-      try {
-        const saved = JSON.parse(
-          sessionStorage.getItem(FACTS_STORAGE_KEY) || "null"
-        );
-
-        if (!saved || typeof saved !== "object" || Array.isArray(saved)) {
-          return { ...EMPTY_BUSINESS_FACTS };
-        }
-
-        return {
-          ...EMPTY_BUSINESS_FACTS,
-          ...saved,
-          desiredFeatures: Array.isArray(saved.desiredFeatures)
-            ? saved.desiredFeatures.slice(0, 10)
-            : []
-        };
-      } catch {
-        return { ...EMPTY_BUSINESS_FACTS };
-      }
-    }
-
     function saveConversation() {
       try {
-        sessionStorage.setItem(
-          CONVERSATION_STORAGE_KEY,
+        localStorage.setItem(
+          STORAGE_KEY,
           JSON.stringify(conversationHistory.slice(-MAX_SAVED_MESSAGES))
         );
       } catch {
-        // The chat still works if browser storage is unavailable.
-      }
-    }
-
-    function saveBusinessFacts() {
-      try {
-        sessionStorage.setItem(
-          FACTS_STORAGE_KEY,
-          JSON.stringify(businessFacts)
-        );
-      } catch {
-        // The chat still works if browser storage is unavailable.
+        // Futura still works when browser storage is unavailable.
       }
     }
 
@@ -667,10 +617,8 @@ What can I help you with today?`;
       messages.innerHTML = "";
 
       if (conversationHistory.length === 0) {
-        addMessage("futura", greeting);
-        conversationHistory.push({ role: "assistant", content: greeting });
+        conversationHistory = [{ role: "assistant", content: greeting }];
         saveConversation();
-        return;
       }
 
       conversationHistory.forEach((item) => {
@@ -694,10 +642,30 @@ What can I help you with today?`;
       sendButton.setAttribute("aria-busy", String(isBusy));
     }
 
+    function isResetRequest(text) {
+      const normalized = text.trim().toLowerCase();
+      return [
+        "start over",
+        "new conversation",
+        "clear conversation",
+        "reset conversation",
+        "empezar de nuevo",
+        "nueva conversación",
+        "borrar conversación"
+      ].includes(normalized);
+    }
+
     async function sendMessage() {
       const userMessage = input.value.trim();
 
-      if (!userMessage || requestInProgress) {
+      if (!userMessage || requestInProgress) return;
+
+      if (isResetRequest(userMessage)) {
+        conversationHistory = [{ role: "assistant", content: greeting }];
+        saveConversation();
+        renderConversation();
+        input.value = "";
+        input.focus();
         return;
       }
 
@@ -711,16 +679,13 @@ What can I help you with today?`;
       showTyping();
 
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 45000);
+      const timeoutId = window.setTimeout(() => controller.abort(), 75000);
 
       try {
         const response = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: conversationHistory,
-            businessFacts
-          }),
+          body: JSON.stringify({ messages: conversationHistory }),
           signal: controller.signal
         });
 
@@ -735,17 +700,6 @@ What can I help you with today?`;
             ? data.reply.trim()
             : "I'm sorry, but I wasn't able to create a response.";
 
-        if (data.businessFacts && typeof data.businessFacts === "object") {
-          businessFacts = {
-            ...EMPTY_BUSINESS_FACTS,
-            ...data.businessFacts,
-            desiredFeatures: Array.isArray(data.businessFacts.desiredFeatures)
-              ? data.businessFacts.desiredFeatures.slice(0, 10)
-              : businessFacts.desiredFeatures
-          };
-          saveBusinessFacts();
-        }
-
         conversationHistory.push({ role: "assistant", content: reply });
         conversationHistory = conversationHistory.slice(-MAX_SAVED_MESSAGES);
         saveConversation();
@@ -756,7 +710,8 @@ What can I help you with today?`;
         const errorMessage =
           error.name === "AbortError"
             ? "I'm taking longer than expected. Please try your message again."
-            : "I'm temporarily unable to connect. Please try again in a moment.";
+            : error.message ||
+              "I'm temporarily unable to connect. Please try again in a moment.";
 
         addMessage("futura", errorMessage);
       } finally {
@@ -770,9 +725,7 @@ What can I help you with today?`;
     launcher.addEventListener("click", () => {
       chat.classList.add("open");
 
-      if (messages.children.length === 0) {
-        renderConversation();
-      }
+      if (messages.children.length === 0) renderConversation();
 
       input.focus();
     });
