@@ -27,7 +27,9 @@ function setCors(req, res) {
 }
 
 function sanitizeMessages(rawMessages) {
-  if (!Array.isArray(rawMessages)) return [];
+  if (!Array.isArray(rawMessages)) {
+    return [];
+  }
 
   return rawMessages
     .filter(
@@ -42,6 +44,38 @@ function sanitizeMessages(rawMessages) {
       role: item.role,
       content: item.content.trim().slice(0, MAX_MESSAGE_LENGTH),
     }));
+}
+
+function extractReply(response) {
+  if (
+    typeof response?.output_text === "string" &&
+    response.output_text.trim()
+  ) {
+    return response.output_text.trim();
+  }
+
+  if (!Array.isArray(response?.output)) {
+    return "";
+  }
+
+  const textParts = [];
+
+  for (const outputItem of response.output) {
+    if (!Array.isArray(outputItem?.content)) {
+      continue;
+    }
+
+    for (const contentItem of outputItem.content) {
+      if (
+        contentItem?.type === "output_text" &&
+        typeof contentItem.text === "string"
+      ) {
+        textParts.push(contentItem.text);
+      }
+    }
+  }
+
+  return textParts.join("\n").trim();
 }
 
 export default async function handler(req, res) {
@@ -67,6 +101,7 @@ export default async function handler(req, res) {
 
   if (!process.env.OPENAI_API_KEY) {
     console.error("OPENAI_API_KEY is missing in Vercel.");
+
     return res.status(500).json({
       error: "Futura is not configured yet.",
     });
@@ -85,9 +120,14 @@ export default async function handler(req, res) {
 
     const response = await openai.responses.create({
       model: "gpt-5",
-      tools: [{ type: "web_search" }],
+      tools: [
+        {
+          type: "web_search",
+        },
+      ],
       store: false,
-      max_output_tokens: 900,
+      max_output_tokens: 1200,
+
       instructions: `
 You are Futura, the official AI Business Consultant for Future Tech USA.
 Current date: ${today}.
@@ -118,6 +158,7 @@ CORE BEHAVIOR
 - Never change languages unless requested.
 
 CONVERSATION MEMORY
+- The supplied messages contain the conversation so far.
 - Remember confirmed information provided during the conversation.
 - Never ask for information already provided.
 - Never restart the conversation unless requested.
@@ -164,7 +205,7 @@ FUTURE TECH USA SERVICES
 
 CONSULTATIVE GUIDANCE
 - Understand the visitor's needs before making recommendations.
-- Recommendations should be based upon confirmed information.
+- Base recommendations on confirmed information.
 - Explain benefits, limitations, and tradeoffs clearly.
 - Never invent pricing, promotions, contracts, or policies.
 - Never guarantee savings or approvals.
@@ -173,7 +214,7 @@ CONSULTATIVE GUIDANCE
 PRODUCT COMPARISONS
 - Compare products fairly and objectively.
 - Never automatically recommend Future Tech USA products.
-- Explain that the best solution depends upon the customer's needs.
+- Explain that the best solution depends on the customer's needs.
 - Never criticize competitors.
 
 CONSULTATION RULES
@@ -181,36 +222,26 @@ CONSULTATION RULES
 - Offer consultations naturally when they provide genuine value.
 - Before recommending a consultation, understand enough about the visitor's goals and needs.
 - Ask for contact information gradually and one item at a time.
-- Appropriate information includes:
-    - Name
-    - Business Name
-    - Email Address
-    - Phone Number
-    - Preferred Day or Time
+- Appropriate information includes name, business name, email address, phone number, and preferred day or time.
 - Never claim an appointment has been booked because calendar integration is not connected yet.
 
 LEAD AND URGENCY AWARENESS
 - Recognize urgency naturally.
 - Never prioritize collecting customer information over helping the visitor.
-- High-value opportunities may include:
-    - Multiple locations
-    - Business expansions
-    - Large monthly processing volume
-    - Replacement POS systems
-    - Complex integrations
-    - Immediate implementation timelines.
+- High-value opportunities may include multiple locations, business expansions, large monthly processing volume, replacement POS systems, complex integrations, or immediate implementation timelines.
 - Urgent situations should prioritize helping the visitor immediately.
-- Internal lead intelligence may consider business goals, urgency, timeline, and customer needs when determining whether a consultation could be beneficial.
-- Never reveal internal lead scores or labels to visitors unless specifically instructed by the application.
+- Internal lead intelligence may consider business goals, urgency, timeline, and customer needs when deciding whether a consultation could be beneficial.
+- Never reveal internal lead scores or labels to visitors.
 
 TECHNICAL SUPPORT
 - Provide safe troubleshooting guidance for payment terminals, POS systems, networking, and related equipment.
-- Never request passwords, bank credentials, Social Security numbers, or complete payment card information.
+- Begin with simple and reversible troubleshooting steps.
+- Never request passwords, bank credentials, Social Security numbers, complete payment-card numbers, or security codes.
 - Account-specific issues should be referred to an authorized Future Tech USA representative.
 
 WEB SEARCH
 - Use web search only when current or changing information is required.
-- Prefer official manufacturers, official documentation, and authoritative sources.
+- Prefer official manufacturers, official documentation, government sources, and authoritative publications.
 - Clearly distinguish third-party information from Future Tech USA information.
 - Never use web search to guess Future Tech USA's private pricing or policies.
 
@@ -225,18 +256,36 @@ STYLE
 MOST IMPORTANT RULE
 Every person visiting Future Tech USA should leave feeling that they were helped, whether or not they ever become a customer.
 `,
+
       input: messages,
     });
 
-    const reply = response.output_text?.trim();
+    const reply = extractReply(response);
 
     if (!reply) {
+      console.error(
+        "OpenAI returned no readable assistant text:",
+        JSON.stringify(
+          {
+            id: response?.id,
+            status: response?.status,
+            error: response?.error,
+            incomplete_details: response?.incomplete_details,
+            output: response?.output,
+          },
+          null,
+          2
+        )
+      );
+
       return res.status(502).json({
         error: "Futura did not return a response. Please try again.",
       });
     }
 
-    return res.status(200).json({ reply });
+    return res.status(200).json({
+      reply,
+    });
   } catch (error) {
     console.error("Futura API error:", {
       name: error?.name,
