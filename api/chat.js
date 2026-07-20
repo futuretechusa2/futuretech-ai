@@ -13,6 +13,7 @@ const ALLOWED_ORIGINS = new Set([
 
 const MAX_MESSAGES = 30;
 const MAX_MESSAGE_LENGTH = 3000;
+const MAX_ATTEMPTS = 2;
 
 function setCors(req, res) {
   const origin = req.headers.origin;
@@ -78,6 +79,17 @@ function extractReply(response) {
   return textParts.join("\n").trim();
 }
 
+async function createFuturaResponse(messages, instructions) {
+  return openai.responses.create({
+    model: "gpt-5",
+    tools: [{ type: "web_search" }],
+    store: false,
+    max_output_tokens: 1200,
+    instructions,
+    input: messages,
+  });
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
 
@@ -118,17 +130,7 @@ export default async function handler(req, res) {
   try {
     const today = new Date().toISOString().slice(0, 10);
 
-    const response = await openai.responses.create({
-      model: "gpt-5",
-      tools: [
-        {
-          type: "web_search",
-        },
-      ],
-      store: false,
-      max_output_tokens: 1200,
-
-      instructions: `
+    const instructions = `
 You are Futura, the official AI Business Consultant for Future Tech USA.
 Current date: ${today}.
 
@@ -230,7 +232,6 @@ LEAD AND URGENCY AWARENESS
 - Never prioritize collecting customer information over helping the visitor.
 - High-value opportunities may include multiple locations, business expansions, large monthly processing volume, replacement POS systems, complex integrations, or immediate implementation timelines.
 - Urgent situations should prioritize helping the visitor immediately.
-- Internal lead intelligence may consider business goals, urgency, timeline, and customer needs when deciding whether a consultation could be beneficial.
 - Never reveal internal lead scores or labels to visitors.
 
 TECHNICAL SUPPORT
@@ -255,36 +256,41 @@ STYLE
 
 MOST IMPORTANT RULE
 Every person visiting Future Tech USA should leave feeling that they were helped, whether or not they ever become a customer.
-`,
+`;
 
-      input: messages,
-    });
+    let lastResponse = null;
 
-    const reply = extractReply(response);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      lastResponse = await createFuturaResponse(messages, instructions);
 
-    if (!reply) {
-      console.error(
-        "OpenAI returned no readable assistant text:",
-        JSON.stringify(
-          {
-            id: response?.id,
-            status: response?.status,
-            error: response?.error,
-            incomplete_details: response?.incomplete_details,
-            output: response?.output,
-          },
-          null,
-          2
-        )
-      );
+      const reply = extractReply(lastResponse);
 
-      return res.status(502).json({
-        error: "Futura did not return a response. Please try again.",
-      });
+      if (reply) {
+        return res.status(200).json({
+          reply,
+        });
+      }
+
+      console.warn(`Futura returned no text on attempt ${attempt}.`);
     }
 
-    return res.status(200).json({
-      reply,
+    console.error(
+      "OpenAI returned no readable assistant text after retrying:",
+      JSON.stringify(
+        {
+          id: lastResponse?.id,
+          status: lastResponse?.status,
+          error: lastResponse?.error,
+          incomplete_details: lastResponse?.incomplete_details,
+          output: lastResponse?.output,
+        },
+        null,
+        2
+      )
+    );
+
+    return res.status(502).json({
+      error: "Futura did not return a response. Please try again.",
     });
   } catch (error) {
     console.error("Futura API error:", {
