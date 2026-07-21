@@ -536,7 +536,11 @@
 
   <script>
     const API_URL = "https://futuretech-ai.vercel.app/api/chat";
+    const EMAIL_API_URL =
+      "https://futuretech-ai.vercel.app/api/consultation-email";
+
     const STORAGE_KEY = "futura_conversation_v1";
+    const NOTIFICATION_KEY = "futura_last_notification_v1";
     const MAX_SAVED_MESSAGES = 30;
 
     const launcher = document.getElementById("futura-launcher");
@@ -556,12 +560,110 @@ I can help with payment processing, POS systems, restaurant and retail solutions
 
 What can I help you with today?`;
 
+    const OPPORTUNITY_GROUPS = [
+      {
+        label: "POS system",
+        terms: [
+          "pos system",
+          "point of sale",
+          "point-of-sale",
+          "clover",
+          "toast",
+          "square",
+          "skytab",
+          "lightspeed",
+          "shopify pos",
+          "dejavoo",
+          "new pos",
+          "replace my pos",
+          "replacing toast",
+          "replacing clover"
+        ]
+      },
+      {
+        label: "credit card terminal",
+        terms: [
+          "credit card terminal",
+          "credit card machine",
+          "card terminal",
+          "payment terminal",
+          "countertop terminal",
+          "wireless terminal",
+          "mobile terminal",
+          "clover flex",
+          "clover mini",
+          "dejavoo terminal"
+        ]
+      },
+      {
+        label: "credit and debit card processing",
+        terms: [
+          "accept credit cards",
+          "accept debit cards",
+          "credit card processing",
+          "debit card processing",
+          "take credit cards",
+          "take debit cards",
+          "start accepting credit",
+          "start accepting debit",
+          "merchant services",
+          "payment processing",
+          "card processing"
+        ]
+      },
+      {
+        label: "EBT acceptance",
+        terms: [
+          "accept ebt",
+          "ebt",
+          "snap benefits",
+          "food stamps"
+        ]
+      },
+      {
+        label: "pricing or quote",
+        terms: [
+          "pricing",
+          "price",
+          "quote",
+          "rates",
+          "processing fees",
+          "lower my fees",
+          "lowering processing fees"
+        ]
+      },
+      {
+        label: "callback or consultation",
+        terms: [
+          "call me",
+          "contact me",
+          "email me",
+          "speak with someone",
+          "talk to someone",
+          "consultation",
+          "appointment",
+          "callback",
+          "reach me"
+        ]
+      }
+    ];
+
+    const BUSINESS_TYPES = [
+      ["Restaurant", ["restaurant", "bar", "cafe", "coffee shop", "bakery", "pizzeria", "food truck"]],
+      ["Retail", ["retail", "store", "boutique", "liquor store", "convenience store", "grocery store", "jewelry store"]],
+      ["Medical", ["medical", "dental", "dentist", "doctor", "clinic", "chiropractic", "veterinary"]],
+      ["Automotive", ["automotive", "auto repair", "repair shop", "mechanic", "body shop", "tire shop", "dealership"]],
+      ["Professional Services", ["law firm", "accounting", "insurance agency", "salon", "spa", "barbershop", "consulting firm"]]
+    ];
+
     let conversationHistory = loadConversation();
     let requestInProgress = false;
 
     function loadConversation() {
       try {
-       const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]");
+        const saved = JSON.parse(
+          sessionStorage.getItem(STORAGE_KEY) || "[]"
+        );
 
         if (!Array.isArray(saved)) return [];
 
@@ -581,9 +683,11 @@ What can I help you with today?`;
 
     function saveConversation() {
       try {
-       sessionStorage.setItem(
+        sessionStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify(conversationHistory.slice(-MAX_SAVED_MESSAGES))
+          JSON.stringify(
+            conversationHistory.slice(-MAX_SAVED_MESSAGES)
+          )
         );
       } catch {
         // Futura still works when browser storage is unavailable.
@@ -617,12 +721,17 @@ What can I help you with today?`;
       messages.innerHTML = "";
 
       if (conversationHistory.length === 0) {
-        conversationHistory = [{ role: "assistant", content: greeting }];
+        conversationHistory = [
+          { role: "assistant", content: greeting }
+        ];
         saveConversation();
       }
 
       conversationHistory.forEach((item) => {
-        addMessage(item.role === "user" ? "user" : "futura", item.content);
+        addMessage(
+          item.role === "user" ? "user" : "futura",
+          item.content
+        );
       });
     }
 
@@ -644,6 +753,7 @@ What can I help you with today?`;
 
     function isResetRequest(text) {
       const normalized = text.trim().toLowerCase();
+
       return [
         "start over",
         "new conversation",
@@ -655,13 +765,236 @@ What can I help you with today?`;
       ].includes(normalized);
     }
 
+    function getUserConversationText() {
+      return conversationHistory
+        .filter((message) => message.role === "user")
+        .map((message) => message.content)
+        .join("\n");
+    }
+
+    function extractEmail(text) {
+      const match = text.match(
+        /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i
+      );
+
+      return match ? match[0] : "";
+    }
+
+    function extractPhone(text) {
+      const matches = text.match(
+        /(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/g
+      );
+
+      if (!matches || matches.length === 0) {
+        return "";
+      }
+
+      return matches[matches.length - 1].trim();
+    }
+
+    function extractName(text) {
+      const patterns = [
+        /\bmy name is\s+([a-z][a-z' -]{1,60})/i,
+        /\bmi nombre es\s+([a-záéíóúñü][a-záéíóúñü' -]{1,60})/i
+      ];
+
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+
+        if (match) {
+          return match[1]
+            .trim()
+            .replace(/\s+/g, " ")
+            .replace(/\b\w/g, (letter) => letter.toUpperCase());
+        }
+      }
+
+      return "Website Customer";
+    }
+
+    function extractBusinessName(text) {
+      const patterns = [
+        /\b(?:my business is|business name is|company is|company name is|restaurant is|store is)\s+([^.,\n]{2,100})/i,
+        /\b(?:mi negocio se llama|el nombre del negocio es)\s+([^.,\n]{2,100})/i
+      ];
+
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+
+        if (match) {
+          return match[1].trim();
+        }
+      }
+
+      return "";
+    }
+
+    function detectBusinessType(text) {
+      const normalized = text.toLowerCase();
+
+      for (const [label, terms] of BUSINESS_TYPES) {
+        if (terms.some((term) => normalized.includes(term))) {
+          return label;
+        }
+      }
+
+      return "";
+    }
+
+    function detectInterest(text) {
+      const normalized = text.toLowerCase();
+
+      return OPPORTUNITY_GROUPS
+        .filter((group) =>
+          group.terms.some((term) => normalized.includes(term))
+        )
+        .map((group) => group.label);
+    }
+
+    function extractPreferredContactTime(text) {
+      const patterns = [
+        /\b(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b[^.\n]{0,60}\b(?:at|around|after|before)\b[^.\n]{0,30}/i,
+        /\b(?:mañana|hoy|lunes|martes|miércoles|jueves|viernes|sábado|domingo)\b[^.\n]{0,60}\b(?:a las|después de|antes de)\b[^.\n]{0,30}/i
+      ];
+
+      for (const pattern of patterns) {
+        const match = text.match(pattern);
+
+        if (match) {
+          return match[0].trim();
+        }
+      }
+
+      return "";
+    }
+
+    function buildOpportunitySummary({
+      name,
+      businessName,
+      businessType,
+      interest,
+      email,
+      phone,
+      preferredContactTime
+    }) {
+      const details = [
+        `Customer: ${name}`,
+        businessName ? `Business: ${businessName}` : "",
+        businessType ? `Business type: ${businessType}` : "",
+        interest.length
+          ? `Interest: ${interest.join(", ")}`
+          : "",
+        email ? `Email: ${email}` : "",
+        phone ? `Phone: ${phone}` : "",
+        preferredContactTime
+          ? `Preferred contact time: ${preferredContactTime}`
+          : ""
+      ].filter(Boolean);
+
+      return details.join("\n");
+    }
+
+    function getNotificationSignature({
+      email,
+      phone,
+      interest
+    }) {
+      return JSON.stringify({
+        email: email.toLowerCase(),
+        phone: phone.replace(/\D/g, ""),
+        interest: [...interest].sort()
+      });
+    }
+
+    async function notifyFutureTechIfNeeded() {
+      const userText = getUserConversationText();
+      const email = extractEmail(userText);
+      const phone = extractPhone(userText);
+      const interest = detectInterest(userText);
+
+      if ((!email && !phone) || interest.length === 0) {
+        return;
+      }
+
+      const signature = getNotificationSignature({
+        email,
+        phone,
+        interest
+      });
+
+      if (
+        sessionStorage.getItem(NOTIFICATION_KEY) === signature
+      ) {
+        return;
+      }
+
+      const name = extractName(userText);
+      const businessName = extractBusinessName(userText);
+      const businessType = detectBusinessType(userText);
+      const preferredContactTime =
+        extractPreferredContactTime(userText);
+
+      const payload = {
+        name,
+        businessName,
+        email,
+        phone,
+        businessType,
+        interest: interest.join(", "),
+        preferredContactTime,
+        summary: buildOpportunitySummary({
+          name,
+          businessName,
+          businessType,
+          interest,
+          email,
+          phone,
+          preferredContactTime
+        }),
+        messages: conversationHistory.slice(-MAX_SAVED_MESSAGES)
+      };
+
+      try {
+        const response = await fetch(EMAIL_API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Customer follow-up email could not be sent."
+          );
+        }
+
+        sessionStorage.setItem(
+          NOTIFICATION_KEY,
+          signature
+        );
+      } catch (error) {
+        console.error(
+          "Futura notification email error:",
+          error
+        );
+      }
+    }
+
     async function sendMessage() {
       const userMessage = input.value.trim();
 
       if (!userMessage || requestInProgress) return;
 
       if (isResetRequest(userMessage)) {
-        conversationHistory = [{ role: "assistant", content: greeting }];
+        conversationHistory = [
+          { role: "assistant", content: greeting }
+        ];
+
+        sessionStorage.removeItem(NOTIFICATION_KEY);
         saveConversation();
         renderConversation();
         input.value = "";
@@ -670,8 +1003,12 @@ What can I help you with today?`;
       }
 
       addMessage("user", userMessage);
-      conversationHistory.push({ role: "user", content: userMessage });
-      conversationHistory = conversationHistory.slice(-MAX_SAVED_MESSAGES);
+      conversationHistory.push({
+        role: "user",
+        content: userMessage
+      });
+      conversationHistory =
+        conversationHistory.slice(-MAX_SAVED_MESSAGES);
       saveConversation();
 
       input.value = "";
@@ -679,31 +1016,48 @@ What can I help you with today?`;
       showTyping();
 
       const controller = new AbortController();
-      const timeoutId = window.setTimeout(() => controller.abort(), 75000);
+      const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        75000
+      );
 
       try {
         const response = await fetch(API_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: conversationHistory }),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            messages: conversationHistory
+          }),
           signal: controller.signal
         });
 
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(data.error || "Futura could not answer right now.");
+          throw new Error(
+            data.error ||
+              "Futura could not answer right now."
+          );
         }
 
         const reply =
-          typeof data.reply === "string" && data.reply.trim()
+          typeof data.reply === "string" &&
+          data.reply.trim()
             ? data.reply.trim()
             : "I'm sorry, but I wasn't able to create a response.";
 
-        conversationHistory.push({ role: "assistant", content: reply });
-        conversationHistory = conversationHistory.slice(-MAX_SAVED_MESSAGES);
+        conversationHistory.push({
+          role: "assistant",
+          content: reply
+        });
+        conversationHistory =
+          conversationHistory.slice(-MAX_SAVED_MESSAGES);
         saveConversation();
         addMessage("futura", reply);
+
+        notifyFutureTechIfNeeded();
       } catch (error) {
         console.error("Futura chat error:", error);
 
@@ -725,7 +1079,9 @@ What can I help you with today?`;
     launcher.addEventListener("click", () => {
       chat.classList.add("open");
 
-      if (messages.children.length === 0) renderConversation();
+      if (messages.children.length === 0) {
+        renderConversation();
+      }
 
       input.focus();
     });
