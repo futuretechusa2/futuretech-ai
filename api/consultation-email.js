@@ -244,10 +244,14 @@ Future Tech USA
 
       <hr style="margin-top:28px;border:none;border-top:1px solid #ddd;" />
 
-      <p style="font-size:13px;color:#666;">
-        Prepared by FUTURA<br />
-        Future Tech USA
-      </p>
+    <p style="font-size:13px;color:#666;">
+  Prepared by FUTURA<br />
+  Future Tech USA
+</p>
+
+<p style="font-size:13px;font-weight:700;color:#111;margin-top:18px;">
+  This lead was qualified by FUTURA AI and is ready for follow-up by the Future Tech USA sales team.
+</p>
     </div>
   `;
 
