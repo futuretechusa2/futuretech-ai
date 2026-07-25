@@ -1,7 +1,64 @@
-const QUOTE_TERMS = [
+const QUOTE_PHRASES = [
+  // English
+  "send me a quote",
+  "get a quote",
+  "need a quote",
+  "want a quote",
+  "would like a quote",
+  "request a quote",
+  "give me a quote",
+  "email me a quote",
+  "send a quote",
+  "need an estimate",
+  "want an estimate",
+  "send me an estimate",
+  "need pricing",
+  "want pricing",
+  "pricing information",
+  "send me pricing",
+  "need a proposal",
+  "want a proposal",
+
+  // Spanish
+  "quiero una cotizacion",
+  "quiero cotizacion",
+  "necesito una cotizacion",
+  "necesito cotizacion",
+  "enviame una cotizacion",
+  "envia una cotizacion",
+  "mandame una cotizacion",
+  "manda una cotizacion",
+  "me puedes enviar una cotizacion",
+  "puedes enviarme una cotizacion",
+  "quisiera una cotizacion",
+  "solicitar una cotizacion",
+  "solicito una cotizacion",
+
+  "quiero un presupuesto",
+  "necesito un presupuesto",
+  "enviame un presupuesto",
+  "mandame un presupuesto",
+  "me puedes enviar un presupuesto",
+  "quisiera un presupuesto",
+
+  "quiero una propuesta",
+  "necesito una propuesta",
+  "enviame una propuesta",
+  "mandame una propuesta",
+  "quisiera una propuesta",
+
+  "quiero saber el precio",
+  "necesito saber el precio",
+  "cuanto cuesta",
+  "cuanto costaria",
+  "cual es el precio",
+  "informacion de precios",
+  "precios por favor",
+];
+
+const QUOTE_WORDS = [
   // English
   "quote",
-  "quotation",
   "estimate",
   "proposal",
   "pricing",
@@ -12,38 +69,38 @@ const QUOTE_TERMS = [
   "propuesta",
   "precio",
   "precios",
-  "tarifa",
-  "tarifas",
+  "costo",
+  "costos",
 ];
 
-const REQUEST_TERMS = [
+const REQUEST_WORDS = [
   // English
   "send",
-  "email",
   "give",
-  "prepare",
-  "create",
-  "want",
-  "need",
-  "receive",
   "get",
+  "need",
+  "want",
+  "request",
+  "email",
+  "receive",
+  "like",
 
   // Spanish
-  "envia",
-  "enviar",
-  "enviame",
-  "manda",
-  "mandar",
-  "mandame",
-  "correo",
   "quiero",
   "necesito",
+  "enviar",
+  "enviame",
+  "envia",
+  "mandar",
+  "mandame",
+  "manda",
+  "solicitar",
+  "solicito",
   "recibir",
-  "prepara",
-  "preparar",
-  "crea",
-  "crear",
-  "dame",
+  "quisiera",
+  "puedes",
+  "podrias",
+  "deseo",
 ];
 
 export function normalizeText(value = "") {
@@ -57,41 +114,53 @@ export function normalizeText(value = "") {
 }
 
 export function isQuoteRequest(message = "") {
-  const text = normalizeText(message);
+  const normalizedMessage = normalizeText(message);
 
-  if (!text) {
+  if (!normalizedMessage) {
     return false;
   }
 
-  const hasQuoteTerm = QUOTE_TERMS.some((term) =>
-    text.includes(term)
+  const containsExactPhrase = QUOTE_PHRASES.some((phrase) =>
+    normalizedMessage.includes(phrase)
   );
 
-  const hasRequestTerm = REQUEST_TERMS.some((term) =>
-    text.includes(term)
+  if (containsExactPhrase) {
+    return true;
+  }
+
+  const containsQuoteWord = QUOTE_WORDS.some((word) =>
+    normalizedMessage.includes(word)
   );
 
-  return hasQuoteTerm && hasRequestTerm;
+  const containsRequestWord = REQUEST_WORDS.some((word) =>
+    normalizedMessage.includes(word)
+  );
+
+  return containsQuoteWord && containsRequestWord;
 }
 
 export function detectLanguage(message = "") {
-  const text = normalizeText(message);
+  const normalizedMessage = normalizeText(message);
 
-  const spanishTerms = [
+  const spanishIndicators = [
+    "quiero",
+    "necesito",
     "cotizacion",
     "presupuesto",
     "propuesta",
+    "precio",
+    "cuanto",
     "enviame",
     "mandame",
-    "quiero",
-    "necesito",
-    "correo",
-    "precio",
-    "precios",
-    "por favor",
+    "quisiera",
+    "puedes",
+    "gracias",
+    "negocio",
   ];
 
-  return spanishTerms.some((term) => text.includes(term))
-    ? "es"
-    : "en";
+  const isSpanish = spanishIndicators.some((word) =>
+    normalizedMessage.includes(word)
+  );
+
+  return isSpanish ? "es" : "en";
 }
