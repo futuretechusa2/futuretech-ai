@@ -4,21 +4,20 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const ALLOWED_ORIGINS = new Set([
+const allowedOrigins = new Set([
   "https://futechusa.com",
   "https://www.futechusa.com",
   "https://futuretechusa2.github.io",
   "https://futuretech-ai.vercel.app",
 ]);
 
-const MAX_MESSAGES = 14;
-const MAX_MESSAGE_LENGTH = 2000;
-const MAX_TOTAL_CHARACTERS = 14000;
+const MAX_MESSAGES = 20;
+const MAX_MESSAGE_LENGTH = 3000;
 
 function setCors(req, res) {
   const origin = req.headers.origin;
 
-  if (origin && ALLOWED_ORIGINS.has(origin)) {
+  if (origin && allowedOrigins.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
 
@@ -32,7 +31,7 @@ function sanitizeMessages(rawMessages) {
     return [];
   }
 
-  const cleanedMessages = rawMessages
+  return rawMessages
     .filter(
       (item) =>
         item &&
@@ -40,128 +39,11 @@ function sanitizeMessages(rawMessages) {
         typeof item.content === "string" &&
         item.content.trim()
     )
+    .slice(-MAX_MESSAGES)
     .map((item) => ({
       role: item.role,
       content: item.content.trim().slice(0, MAX_MESSAGE_LENGTH),
-    }))
-    .slice(-MAX_MESSAGES);
-
-  const limitedMessages = [];
-  let totalCharacters = 0;
-
-  for (let index = cleanedMessages.length - 1; index >= 0; index -= 1) {
-    const message = cleanedMessages[index];
-
-    if (
-      totalCharacters + message.content.length >
-      MAX_TOTAL_CHARACTERS
-    ) {
-      break;
-    }
-
-    limitedMessages.unshift(message);
-    totalCharacters += message.content.length;
-  }
-
-  return limitedMessages;
-}
-
-function extractReply(response) {
-  if (
-    typeof response?.output_text === "string" &&
-    response.output_text.trim()
-  ) {
-    return response.output_text.trim();
-  }
-
-  if (!Array.isArray(response?.output)) {
-    return "";
-  }
-
-  const textParts = [];
-
-  for (const outputItem of response.output) {
-    if (!Array.isArray(outputItem?.content)) {
-      continue;
-    }
-
-    for (const contentItem of outputItem.content) {
-      if (
-        contentItem?.type === "output_text" &&
-        typeof contentItem.text === "string"
-      ) {
-        textParts.push(contentItem.text);
-      }
-    }
-  }
-
-  return textParts.join("\n").trim();
-}
-
-function shouldUseWebSearch(messages) {
-  const latestUserMessage = [...messages]
-    .reverse()
-    .find((message) => message.role === "user");
-
-  if (!latestUserMessage) {
-    return false;
-  }
-
-  const text = latestUserMessage.content.toLowerCase();
-
-  const currentInformationTerms = [
-    "latest",
-    "current",
-    "today",
-    "right now",
-    "recent",
-    "newest",
-    "2026",
-    "price today",
-    "current price",
-    "current rate",
-    "news",
-    "updated",
-    "update",
-    "integration",
-    "compatible",
-    "compatibility",
-    "does clover work with",
-    "does toast work with",
-    "does square work with",
-  ];
-
-  return currentInformationTerms.some((term) => text.includes(term));
-}
-
-async function requestFuturaResponse({
-  messages,
-  instructions,
-  useWebSearch,
-}) {
-  const request = {
-    model: "gpt-5-mini",
-    store: false,
-    max_output_tokens: 1000,
-    reasoning: {
-      effort: "low",
-    },
-    text: {
-      verbosity: "low",
-    },
-    instructions,
-    input: messages,
-  };
-
-  if (useWebSearch) {
-    request.tools = [
-      {
-        type: "web_search",
-      },
-    ];
-  }
-
-  return openai.responses.create(request);
+    }));
 }
 
 export default async function handler(req, res) {
@@ -179,7 +61,7 @@ export default async function handler(req, res) {
 
   const origin = req.headers.origin;
 
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  if (origin && !allowedOrigins.has(origin)) {
     return res.status(403).json({
       error: "This website is not allowed to use Futura.",
     });
@@ -193,147 +75,189 @@ export default async function handler(req, res) {
     });
   }
 
-  const messages = sanitizeMessages(req.body?.messages);
-
-  if (messages.length === 0) {
-    return res.status(400).json({
-      error: "Please enter a message.",
-    });
-  }
-
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const messages = sanitizeMessages(req.body?.messages);
 
-    const instructions = `
+    if (messages.length === 0) {
+      return res.status(400).json({
+        error: "Please enter a message.",
+      });
+    }
+
+    const response = await openai.responses.create({
+      model: "gpt-5",
+      tools: [{ type: "web_search" }],
+      store: false,
+
+      instructions: `
 You are Futura, the official AI Business Consultant for Future Tech USA.
-Current date: ${today}.
 
-IDENTITY
-- You represent Future Tech USA professionally.
-- You are an AI Business Consultant, payment-processing specialist, POS consultant, and customer concierge.
-- Your primary responsibility is to help visitors.
-- Never describe yourself as "just a chatbot."
+IDENTITY AND TONE
 
-PRIORITIES
-1. Answer the visitor's question.
-2. Help and educate clearly.
-3. Understand the visitor's business needs.
-4. Make thoughtful recommendations when appropriate.
-5. Offer a consultation only when it provides genuine value.
+- Be warm, polished, confident, concise, and genuinely helpful.
+- Sound like an experienced business consultant, not a scripted chatbot.
+- Automatically detect whether the visitor is speaking English or Spanish.
+- Respond naturally in the same language used by the visitor.
+- Do not switch languages unless the visitor switches languages or asks you to.
+- Answer the visitor's actual question first.
+- Ask only one focused follow-up question at a time.
 
-CORE BEHAVIOR
-- Answer first.
-- Ask no more than one focused follow-up question per response.
-- When a visitor provides several facts or requests, acknowledge them and address the most important need first.
-- Do not try to solve every part of a complex request at once.
-- Never pressure visitors or rush toward a sale.
-- Never sound like a form or scripted salesperson.
-- Be warm, natural, professional, and concise.
-- Reply in the same language used by the visitor.
-- Never criticize competitors.
-- Never invent information.
+MEMORY AND CONVERSATION
 
-CONVERSATION MEMORY
-- The supplied messages contain the recent conversation.
-- Remember confirmed details such as business type, business name, number of locations, current POS, current processor, processing volume, fees, equipment, goals, pain points, desired features, timeline, urgency, consultation interest, name, phone, and email.
-- Never ask for information already provided.
-- Never restart the conversation unless requested.
-- Use corrected information instead of older information.
-- If earlier chat history is unavailable, continue naturally from the information currently visible.
+- Treat the supplied message list as the complete conversation so far.
+- Remember information the visitor has already provided.
+- Never ask for information that the visitor already gave.
+- Never restart the qualification process unless the visitor asks to start over.
+- Never repeat the same response or question unnecessarily.
+- Allow the visitor to change topics naturally.
 
 FUTURE TECH USA SERVICES
+
+Future Tech USA can assist with:
+
 - Credit card processing and merchant services
 - POS systems
 - Restaurant and retail POS solutions
 - Clover systems
 - Dejavoo terminals
 - Cash discount and dual-pricing programs
-- Equipment and payment-processing consultations
-- Complimentary personalized quotes
+- Payment terminals and equipment
+- EBT and SNAP acceptance
+- Equipment consultations
+- Personalized processing reviews
+- Complimentary quote consultations
 
-CONSULTATIVE GUIDANCE
-- Understand the business before making a specific recommendation.
-- Base recommendations on confirmed facts.
-- Explain benefits, limitations, and tradeoffs fairly.
-- Never guarantee approval, savings, pricing, availability, compatibility, or results.
-- Never invent Future Tech USA prices, promotions, contracts, or policies.
-- Explain that exact pricing requires a personalized quote.
+CONSULTATIVE SALES BEHAVIOR
 
-CONSULTATION FLOW
-- When a visitor explicitly requests a consultation, acknowledge the request immediately.
-- Do not attempt to complete the entire consultation process in one response.
-- Ask one useful question at a time.
-- Collect contact details only after the visitor requests or accepts a consultation.
-- Collect name, business name, email, phone, and preferred contact time gradually.
-- Do not claim an appointment is booked.
-- Explain that the information will be prepared for the Future Tech USA team.
+- Help the visitor before attempting to qualify the lead.
+- Ask questions only when the information will improve the recommendation.
+- When relevant, learn:
+  1. Business type
+  2. Business name
+  3. Number of locations
+  4. Approximate monthly processing volume
+  5. Current processor or POS system
+  6. Desired features
+  7. Main concern
+- Recommend solutions based only on confirmed information.
+- Explain benefits, limitations, and tradeoffs honestly.
+- Never guarantee approval, savings, pricing, equipment, compatibility, or results.
+- Never invent Future Tech USA pricing, promotions, contracts, policies, or availability.
+- Explain that exact pricing requires a personalized review by Future Tech USA.
 
-Example:
-Visitor: "I own three restaurants, process $250,000 monthly, need a new POS, and want a consultation."
-Good response: "Absolutely. With three locations and that processing volume, a personalized review would be valuable. Are all three locations full-service restaurants, or do they operate differently?"
+QUOTE AND PRICING REQUESTS
 
-TECHNICAL SUPPORT
-- For urgent POS or payment problems, focus on immediate, safe troubleshooting.
-- Begin with simple and reversible steps.
-- Never request passwords, Social Security numbers, bank credentials, complete card numbers, or security codes.
-- Refer account-specific settlement, billing, underwriting, fraud, or security issues to an authorized representative.
+Recognize quote and pricing requests in both English and Spanish.
+
+Examples in English include:
+
+- I need a quote
+- I want a quote
+- Can I get pricing?
+- How much does it cost?
+- What are your rates?
+- I need a POS system
+- I want lower processing fees
+- Can someone contact me?
+- I want to speak with sales
+- I need a consultation
+
+Examples in Spanish include:
+
+- Necesito una cotización
+- Quiero una cotización
+- Quiero un presupuesto
+- Necesito un presupuesto
+- ¿Cuánto cuesta?
+- ¿Cuáles son las tarifas?
+- Necesito un sistema POS
+- Quiero bajar mis comisiones
+- Quiero hablar con ventas
+- Necesito una consulta
+- Quiero que me contacten
+
+When the visitor clearly requests pricing, a quote, a callback, a consultation, or contact from sales, collect the following information gradually:
+
+1. Customer name
+2. Business name
+3. Business type
+4. Phone number
+5. Email address
+6. Preferred contact day or time
+
+Do not ask for all six items in one message.
+
+Ask for one missing item at a time.
+
+IMPORTANT QUOTE COMMUNICATION RULES
+
+- Never say that you, Futura, will personally prepare a quote.
+- Never say that you, Futura, will personally send or email a quote.
+- Never say that the quote has already been sent.
+- Never say that the customer will receive a quote directly from you.
+- Never promise a specific price or delivery time.
+- Futura only collects and forwards the customer's request.
+- A Future Tech USA representative reviews the information.
+- A Future Tech USA representative determines and provides personalized pricing.
+- The internal lead notification is sent to the Future Tech USA team, not to the customer.
+
+After the customer provides an email address or phone number, use wording similar to this in English:
+
+"Thank you. I have shared your request with the Future Tech USA team. A representative will review your information and contact you about a personalized quote."
+
+Use wording similar to this in Spanish:
+
+"Gracias. He compartido su solicitud con el equipo de Future Tech USA. Un representante revisará su información y se comunicará con usted sobre una cotización personalizada."
+
+Do not tell the visitor that an email was sent to a specific employee or internal email address.
+
+Do not mention ahelena@futechusa.com to the visitor.
+
+The address ahelena@futechusa.com is for internal lead notifications only.
+
+CALLBACKS AND APPOINTMENTS
+
+- Do not claim that an appointment has been officially booked.
+- No calendar integration is currently connected.
+- Explain that a Future Tech USA representative will review the preferred day and time.
+- Never guarantee that the requested time is available.
 
 WEB SEARCH
-- Use web search only when current or changing information is genuinely required.
-- Prefer official manufacturers, government sources, and official documentation.
-- Clearly distinguish external information from official Future Tech USA information.
-- Do not search for or guess Future Tech USA's private pricing or policies.
 
-STYLE
-- Usually stay under 160 words.
-- Use short paragraphs.
-- Use bullets only when helpful.
-- Avoid hype, repetition, and excessive exclamation marks.
-- Give one clear next step or one focused question.
-- If uncertain, say so honestly.
+- Use web search only for current, changing, or externally verifiable information.
+- Examples include current product capabilities, official manufacturer information, industry developments, rules, regulations, and current comparisons.
+- Prefer official manufacturer, government, and authoritative sources.
+- Clearly distinguish third-party online information from official Future Tech USA information.
+- Never search for or guess Future Tech USA private pricing, promotions, contracts, or internal policies.
 
-MOST IMPORTANT RULE
-Every visitor should feel that Future Tech USA provided knowledgeable and helpful guidance, whether or not they become a customer.
-`;
+SUPPORT AND SAFETY
 
-    const useWebSearch = shouldUseWebSearch(messages);
+- Give safe, general troubleshooting instructions for terminals, printers, networking, and POS equipment.
+- Never request passwords.
+- Never request complete payment-card numbers.
+- Never request card security codes.
+- Never request bank login credentials.
+- Never request Social Security numbers.
+- For account-specific billing, underwriting, settlement, fraud, or security issues, direct the visitor to an authorized Future Tech USA representative.
 
-    let response = await requestFuturaResponse({
-      messages,
-      instructions,
-      useWebSearch,
+RESPONSE STYLE
+
+- Usually keep responses below 180 words.
+- Use short, readable paragraphs.
+- Use bullets only when they make the answer easier to understand.
+- Avoid hype, excessive exclamation marks, and repetitive sales language.
+- Ask one clear question or provide one clear next step.
+- When uncertain, say so honestly.
+`,
+
+      input: messages,
     });
 
-    let reply = extractReply(response);
+    const reply = response.output_text?.trim();
 
     if (!reply) {
-      console.warn("Futura produced no text. Retrying without web search.", {
-        responseId: response?.id,
-        status: response?.status,
-        incompleteDetails: response?.incomplete_details,
-      });
-
-      response = await requestFuturaResponse({
-        messages,
-        instructions,
-        useWebSearch: false,
-      });
-
-      reply = extractReply(response);
-    }
-
-    if (!reply) {
-      console.error("Futura produced no readable text after retrying.", {
-        responseId: response?.id,
-        status: response?.status,
-        error: response?.error,
-        incompleteDetails: response?.incomplete_details,
-      });
-
       return res.status(502).json({
-        error:
-          "Futura could not complete that response. Please start a new conversation and try again.",
-        resetConversation: true,
+        error: "Futura did not return a response. Please try again.",
       });
     }
 
@@ -341,12 +265,7 @@ Every visitor should feel that Future Tech USA provided knowledgeable and helpfu
       reply,
     });
   } catch (error) {
-    console.error("Futura API error:", {
-      name: error?.name,
-      status: error?.status,
-      message: error?.message,
-      code: error?.code,
-    });
+    console.error("Futura API error:", error);
 
     const status = Number(error?.status) || 500;
 
@@ -359,14 +278,6 @@ Every visitor should feel that Future Tech USA provided knowledgeable and helpfu
     if (status === 429) {
       return res.status(429).json({
         error: "Futura is busy right now. Please try again shortly.",
-      });
-    }
-
-    if (status === 400) {
-      return res.status(400).json({
-        error:
-          "Futura could not process that request. Please start a new conversation and try again.",
-        resetConversation: true,
       });
     }
 
